@@ -843,9 +843,11 @@ window.startAutoSync = async function(){
 window.seedUsers = function(){
   if(users.length) return;
   users = [
-    {id:1, name:'Admin',      username:'admin',  password:'admin123', role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
-    {id:2, name:'Ms. Jefna',  username:'jefna',  password:'ahf2026',  role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
-    {id:3, name:'Receiver',   username:'receiver',password:'ahf2026', role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+    {id:1, name:'Admin',           username:'admin',    password:'admin123',  role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
+    {id:2, name:'Ms. Jefna',       username:'jefna',    password:'ahf2026',   role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
+    {id:3, name:'Receiver',        username:'receiver', password:'ahf2026',   role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+    {id:4, name:'Victoria Melad',  username:'victoria', password:'Victoria987',role:'admin',     jobTitle:'Project Coordinator',  addedBy:'Admin'},
+    {id:5, name:'Aizel Dale Dario',username:'aizel',    password:'Aizel321',  role:'admin',     jobTitle:'Sales Receptionist',   addedBy:'Admin'},
   ];
   saveUsers();
 }
@@ -879,9 +881,11 @@ window.doLogin = function(){
   // Always ensure default users exist
   if(!users||!users.length){
     users=[
-      {id:1,name:'Admin',      username:'admin',    password:'admin123',role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
-      {id:2,name:'Ms. Jefna',  username:'jefna',    password:'ahf2026', role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
-      {id:3,name:'Receiver',   username:'receiver', password:'ahf2026', role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+      {id:1,name:'Admin',           username:'admin',    password:'admin123',  role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
+      {id:2,name:'Ms. Jefna',       username:'jefna',    password:'ahf2026',   role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
+      {id:3,name:'Receiver',        username:'receiver', password:'ahf2026',   role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+      {id:4,name:'Victoria Melad',  username:'victoria', password:'Victoria987',role:'admin',     jobTitle:'Project Coordinator',  addedBy:'Admin'},
+      {id:5,name:'Aizel Dale Dario',username:'aizel',    password:'Aizel321',  role:'admin',     jobTitle:'Sales Receptionist',   addedBy:'Admin'},
     ];
   }
   const user = users.find(u => u.username.toLowerCase()===uname && u.password===pass);
@@ -1489,8 +1493,8 @@ window.openSRF = function(srfNo){
   if(!srf){ window.toast('SRF not found','error'); return; }
   editingSRF = srfNo;
 
-  var canReq = currentRole==='requester' || currentRole==='admin';
-  var canRcv = currentRole==='receiver'  || currentRole==='admin';
+  var canReq = currentRole==='admin';
+  var canRcv = currentRole==='receiver' || currentRole==='admin';
 
   // Title
   var titleEl = document.getElementById('editTitle');
