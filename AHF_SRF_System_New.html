@@ -1571,8 +1571,8 @@ window.openSRF = function(srfNo){
   var sigHTML = '<div class="srf-detail-card" style="margin-top:12px;">'
     + '<div class="sec-hdr" style="margin-bottom:10px;">Signatures</div>'
     + '<div class="detail-grid">'
-    + '<div class="detail-field"><label>Prepared By</label><span>'+(srf.prepBy||'—')+' '+(srf.prepDate?'· '+srf.prepDate:'')+'</span></div>'
-    + '<div class="detail-field"><label>Approved By</label><span>'+(srf.appBy||'—')+' '+(srf.appDate?'· '+srf.appDate:'')+'</span></div>'
+    + '<div class="detail-field"><label>Requested By</label><span>'+(srf.requestedBy||'—')+(srf.reqTitle?' · <em style="color:var(--accent);font-size:9px;">'+srf.reqTitle+'</em>':'')+'</span></div>'
+    + '<div class="detail-field"><label>Prepared By</label><span>'+(srf.prepBy||srf.submittedBy||'—')+(srf.prepTitle?' · <em style="color:var(--accent);font-size:9px;">'+srf.prepTitle+'</em>':'')+'</span></div>'
     + '</div></div>';
 
   var editContent = document.getElementById('editContent');
