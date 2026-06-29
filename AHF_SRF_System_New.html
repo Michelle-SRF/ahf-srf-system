@@ -1623,17 +1623,34 @@ window.buildWorkbook = function(srfs){
     'Dispatched Date','Received Date','Receiver Notes','Last Updated By'];
   const rows=[headers];
   srfs.forEach(srf=>{
-    srf.materials.forEach(m=>{
-      rows.push([srf.srfNo,srf.date,srf.revNo,srf.project,srf.requestedBy,
-        srf.priority,srf.requiredDate,srf.remarks,m.itemNo,m.materialName,
-        m.materialType,m.colorFinish,m.category,m.sampleSize,m.quantity,m.matRemarks||'',
-        m.status,m.dispatchedDate||'',m.receivedDate||'',m.receiverNotes||'',m.lastUpdatedBy||'']);
-    });
+    if(!srf.materials||!srf.materials.length){
+      rows.push([srf.srfNo,srf.date,srf.revNo||'',srf.project,srf.requestedBy,
+        srf.priority,srf.requiredDate,srf.remarks,'','','','','','','','','','','','','']);
+    } else {
+      srf.materials.forEach(m=>{
+        rows.push([srf.srfNo,srf.date,srf.revNo||'',srf.project,srf.requestedBy,
+          srf.priority,srf.requiredDate,srf.remarks,
+          m.itemNo||'',
+          m.materialName||'',
+          m.materialType||'',
+          m.colorFinish||'',
+          m.glossy||m.category||'',
+          m.sampleSize||'',
+          m.quantity||'',
+          m.reqStatus||m.status||'Requested',
+          m.matRemarks||'',
+          m.dispatchedDate||'',
+          m.receivedDate||'',
+          m.receiverNotes||'',
+          m.lastUpdatedBy||''
+        ]);
+      });
+    }
   });
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:24},{wch:12},{wch:10},{wch:18},{wch:16},{wch:10},
-    {wch:14},{wch:20},{wch:8},{wch:22},{wch:16},{wch:12},
-    {wch:18},{wch:14},{wch:8},{wch:18},{wch:14},{wch:14},{wch:22},{wch:16}];
+  ws['!cols']=[{wch:24},{wch:12},{wch:10},{wch:22},{wch:18},{wch:10},
+    {wch:14},{wch:25},{wch:8},{wch:10},{wch:25},{wch:20},{wch:10},
+    {wch:12},{wch:10},{wch:16},{wch:20},{wch:14},{wch:14},{wch:22},{wch:18}];
   XLSX.utils.book_append_sheet(wb, ws, 'SRF Log');
   return wb;
 }
