@@ -528,6 +528,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
   <div class="page-hdr">
     <h2>Dashboard</h2>
     <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" onclick="window.syncNow()" style="font-size:10px;">↻ Refresh</button>
       <button class="btn btn-gold" onclick="window.exportAllToExcel()">📥 Export All to Excel</button>
     </div>
   </div>
@@ -819,9 +820,9 @@ window.syncNow = async function(){
   setSyncStatus('syncing','Loading from SharePoint...');
   const ok = await window.loadFromSharePoint();
   if(ok){
-    if(document.getElementById('page-dashboard').style.display!=='none') window.renderDashboard();
-    if(document.getElementById('page-summary').style.display!=='none') window.renderSummary();
-    window.toast('✅ Synced! '+srfData.length+' SRFs loaded.','success');
+    if(window.renderDashboard) window.renderDashboard();
+    if(window.renderSummary && document.getElementById('page-summary') && document.getElementById('page-summary').style.display!=='none') window.renderSummary();
+    window.toast('✅ Refreshed! '+srfData.length+' SRFs loaded.','success');
   } else {
     window.toast('⚠️ SharePoint unavailable — showing local data','error');
   }
