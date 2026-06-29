@@ -778,14 +778,15 @@ window.loadFromSharePoint = async function(){
 };
 
 // ── UPDATE STATUS IN SHAREPOINT ───────────────────────────────────────────
-window.updateStatusInSharePoint = async function(itemId, srfDate, overallStatus, updatedBy){
+window.updateStatusInSharePoint = async function(itemId, srfDate, overallStatus, updatedBy, materials){
   try{
     const payload = {
       itemId:        parseInt(itemId),
       srfDate:       srfDate||'',
       overallStatus: overallStatus||'Open',
       lastUpdatedBy: updatedBy||'',
-      lastUpdatedAt: new Date().toISOString()
+      lastUpdatedAt: new Date().toISOString(),
+      materialsJson: JSON.stringify(materials||[])
     };
     const r = await fetch(PA_UPDATE_URL, {
       method:'POST',
@@ -1609,7 +1610,8 @@ window.saveEdits = async function(){
   // Update status in SharePoint
   if(srf.id){
     const newStatus = window.overallStatus(srf);
-    await window.updateStatusInSharePoint(srf.id, srf.date, newStatus, currentFullName||currentUser);
+    srf.overallStatus = newStatus;
+    await window.updateStatusInSharePoint(srf.id, srf.date, newStatus, currentFullName||currentUser, srf.materials);
   }
   window.toast('✅ Changes saved for '+editingSRF,'success');
   if(window.openSRF) window.openSRF(editingSRF);
