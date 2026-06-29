@@ -1709,6 +1709,15 @@ window.seedDemoData = function(){
 // ── INIT ──────────────────────────────────────────────────────────────────
 // Always start at login screen — loginWrap visible by default
 // ── SYNC INIT — users seeded immediately so login always works ────────────
+// ── VERSION CHECK — flush stale user cache when app is updated ────────────
+const APP_USER_VERSION = 'v2.2'; // bump this whenever you add/change users
+try{
+  if(localStorage.getItem('ahf_srf_user_version') !== APP_USER_VERSION){
+    localStorage.removeItem('ahf_srf_users_v1');
+    localStorage.setItem('ahf_srf_user_version', APP_USER_VERSION);
+  }
+}catch(e){}
+
 // Step 1: Load users from localStorage synchronously
 try{
   const storedUsers = localStorage.getItem('ahf_srf_users_v1');
@@ -1718,9 +1727,11 @@ try{
 // Step 2: Seed default users if none exist
 if(!users||!users.length){
   users=[
-    {id:1,name:'Admin',      username:'admin',    password:'admin123',role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
-    {id:2,name:'Ms. Jefna',  username:'jefna',    password:'ahf2026', role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
-    {id:3,name:'Receiver',   username:'receiver', password:'ahf2026', role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+    {id:1,name:'Admin',           username:'admin',    password:'admin123',   role:'admin',     jobTitle:'Technical Manager',    addedBy:'System'},
+    {id:2,name:'Ms. Jefna',       username:'jefna',    password:'ahf2026',    role:'requester', jobTitle:'Project Coordinator',  addedBy:'Admin'},
+    {id:3,name:'Receiver',        username:'receiver', password:'ahf2026',    role:'receiver',  jobTitle:'Warehouse Coordinator',addedBy:'Admin'},
+    {id:4,name:'Victoria Melad',  username:'victoria', password:'Victoria987',role:'admin',     jobTitle:'Project Coordinator',  addedBy:'Admin'},
+    {id:5,name:'Aizel Dale Dario',username:'aizel',    password:'Aizel321',   role:'admin',     jobTitle:'Sales Receptionist',   addedBy:'Admin'},
   ];
   try{ localStorage.setItem('ahf_srf_users_v1', JSON.stringify(users)); }catch(e){}
 }
