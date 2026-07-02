@@ -510,6 +510,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
       <div class="sig-lbl">Requested By</div>
       <input class="sig-inp" id="f-reqby" placeholder="Full Name">
       <input class="sig-inp" id="sig-req-title" placeholder="Job Title" style="margin-top:5px;">
+      <input class="sig-inp" id="f-reqemail" type="email" placeholder="Email (for CC on updates)" style="margin-top:5px;">
       <div class="sig-date-row"><label>Date</label><input type="date" id="f-reqdate-sig"></div>
     </div>
     <div class="sig-cell">
@@ -688,7 +689,7 @@ window.setSyncStatus = function(state, msg){
 
 // ── POWER AUTOMATE FLOW URLs ──────────────────────────────────────────────
 // SRF_Submit Flow JSON Schema includes: srfNo, date, revNo, project,
-// requestedBy, reqTitle, priority, requiredDate, remarks, prepBy, prepTitle,
+// requestedBy, reqTitle, reqEmail, priority, requiredDate, remarks, prepBy, prepTitle,
 // prepDate, submittedBy, submittedAt, isDraft, overallStatus, materialsJson
 const PA_SUBMIT_URL    = 'https://defaultde468fa9dfee42d5bd38a4a7d32047.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/2bada66a52934db49eb0913e2d17bf0e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=cBkIZRpjuBIS88v-6Ga7WHqfaSS0GTw8EhqVDmPHDQI';
 const PA_GETALL_URL    = 'https://defaultde468fa9dfee42d5bd38a4a7d32047.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/93defdab623642afb24eee58ed98d61a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=M1M53ZGNGv8iwR6dT0qwm9xPBHbKnLh5yfieTwHxVHQ';
@@ -707,6 +708,7 @@ window.submitToSharePoint = async function(data){
       project:       data.project||'',
       requestedBy:   data.requestedBy||'',
       reqTitle:      data.reqTitle||'',
+      reqEmail:      data.reqEmail||'',
       priority:      data.priority||'',
       requiredDate:  data.requiredDate||'',
       remarks:       data.remarks||'',
@@ -724,8 +726,15 @@ window.submitToSharePoint = async function(data){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
-    return r.ok;
-  }catch(e){ console.error('SharePoint submit error:',e); return false; }
+    if(!r.ok) return {ok:false};
+    let realSrfNo=null, itemId=null;
+    try{
+      const respJson = await r.json();
+      realSrfNo = respJson.srfNo || null;
+      itemId    = respJson.itemId || null;
+    }catch(e){ /* flow may not return a body in some cases */ }
+    return {ok:true, srfNo:realSrfNo, itemId:itemId};
+  }catch(e){ console.error('SharePoint submit error:',e); return {ok:false}; }
 };
 
 // ── LOAD FROM SHAREPOINT ──────────────────────────────────────────────────
@@ -750,6 +759,7 @@ window.loadFromSharePoint = async function(){
         project:      item.ProjectNameorCode||item.Project_Name_or_Code||'',
         requestedBy:  item.Requested_By||'',
         reqTitle:     item.Requested_By_JobTitle||'',
+        reqEmail:     item.Requested_By_Email||'',
         priority:     choiceVal(item.Priority),
         requiredDate: dateVal(item.RequiredDate||item.Required_Date),
         remarks:      item.Remarks||'',
@@ -970,7 +980,7 @@ window.generateSRFNumber = function(){
   var srf=prefix+String(next).padStart(3,'0');
   var disp=document.getElementById('srfDisplay');
   var dot=document.getElementById('srfDot');
-  if(disp) disp.textContent=srf;
+  if(disp) disp.textContent=srf+' (Provisional — final number confirmed on submit)';
   if(dot) dot.className='srf-dot ready';
   // Set today's date
   var today=new Date().toISOString().slice(0,10);
@@ -1101,6 +1111,7 @@ window.collectForm = function(){
     remarks:      document.getElementById('f-remarks')?document.getElementById('f-remarks').value:'',
     requestedBy:  document.getElementById('f-reqby')?document.getElementById('f-reqby').value:'',
     reqTitle:     document.getElementById('sig-req-title')?document.getElementById('sig-req-title').value:'',
+    reqEmail:     document.getElementById('f-reqemail')?document.getElementById('f-reqemail').value:'',
     prepBy:       document.getElementById('sig-prep')?document.getElementById('sig-prep').value:'',
     prepTitle:    document.getElementById('sig-prep-title')?document.getElementById('sig-prep-title').value:'',
     prepDate:     document.getElementById('sig-prep-date')?document.getElementById('sig-prep-date').value:'',
@@ -1125,24 +1136,31 @@ window.submitForm = async function(){
   if(!hasData){
     window.toast('Please fill in at least one material row','error'); return;
   }
-  // Use same counter key as generateSRFNumber
+  // Locally-generated number is PROVISIONAL ONLY — used for display before
+  // submit, and as an offline fallback. The real, collision-safe number is
+  // assigned server-side by the SRF_Submit Power Automate flow.
   var d=new Date(), mm=MONTHS[d.getMonth()], yyyy=d.getFullYear();
   var key='ahf_srf_counter_'+mm+'_'+yyyy;
   var n=parseInt(localStorage.getItem(key)||'0')+1;
   localStorage.setItem(key,n);
-  // Get the SRF number from display (already generated) or build it
-  var srfEl=document.getElementById('srfDisplay');
-  var displayedSRF=srfEl?srfEl.textContent.trim():'';
-  // Validate it matches current counter
-  var expectedSRF='SRF-AHF-'+mm+'-'+yyyy+'-'+String(n).padStart(3,'0');
-  data.srfNo=expectedSRF;
+  var provisionalSRF='SRF-AHF-'+mm+'-'+yyyy+'-'+String(n).padStart(3,'0');
+  data.srfNo=provisionalSRF;
   srfData.push(data);
   // Save locally
   try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
-  // Submit to SharePoint
+  // Submit to SharePoint — the flow assigns the real, race-condition-safe number
   setSyncStatus('syncing','Submitting to SharePoint...');
-  const spOk = await window.submitToSharePoint(data);
-  if(spOk){
+  const spResult = await window.submitToSharePoint(data);
+  if(spResult.ok){
+    if(spResult.srfNo){
+      // Replace provisional number with the real server-assigned one
+      data.srfNo = spResult.srfNo;
+      if(spResult.itemId) data.id = spResult.itemId;
+      var idx = srfData.indexOf(data);
+      if(idx===-1) idx = srfData.length-1;
+      srfData[idx] = data;
+      try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+    }
     setSyncStatus('live','✅ Submitted to SharePoint');
     window.toast('✅ '+data.srfNo+' submitted to SharePoint!','success',4000);
   } else {
@@ -1166,9 +1184,11 @@ window.clearForm = function(){
   // Reset signature fields
   var reqBy=document.getElementById('f-reqby');
   var reqTitle=document.getElementById('sig-req-title');
+  var reqEmail=document.getElementById('f-reqemail');
   var reqDate=document.getElementById('f-reqdate-sig');
   if(reqBy) reqBy.value='';
   if(reqTitle) reqTitle.value='';
+  if(reqEmail) reqEmail.value='';
   if(reqDate) reqDate.value='';
   // Re-fill Prepared By from logged in user
   var prepBy=document.getElementById('sig-prep');
@@ -1577,7 +1597,7 @@ window.openSRF = function(srfNo){
   var sigHTML = '<div class="srf-detail-card" style="margin-top:12px;">'
     + '<div class="sec-hdr" style="margin-bottom:10px;">Signatures</div>'
     + '<div class="detail-grid">'
-    + '<div class="detail-field"><label>Requested By</label><span>'+(srf.requestedBy||'—')+(srf.reqTitle?' · <em style="color:var(--accent);font-size:9px;">'+srf.reqTitle+'</em>':'')+'</span></div>'
+    + '<div class="detail-field"><label>Requested By</label><span>'+(srf.requestedBy||'—')+(srf.reqTitle?' · <em style="color:var(--accent);font-size:9px;">'+srf.reqTitle+'</em>':'')+(srf.reqEmail?' · <em style="color:var(--accent);font-size:9px;">'+srf.reqEmail+'</em>':'')+'</span></div>'
     + '<div class="detail-field"><label>Prepared By</label><span>'+(srf.prepBy||srf.submittedBy||'—')+(srf.prepTitle?' · <em style="color:var(--accent);font-size:9px;">'+srf.prepTitle+'</em>':'')+'</span></div>'
     + '</div></div>';
 
@@ -1866,7 +1886,7 @@ window.generatePDF = function(){
   }).join('');
 
   var sigRows = '<tr>'
-    +'<td style="padding:8px;border:1px solid #c8b89a;"><div style="font-weight:700;font-size:9px;color:#5a4a38;margin-bottom:4px;">Requested By</div><div style="border-bottom:1px solid #b89a6e;height:18px;margin-bottom:3px;"></div><div style="font-size:9px">'+(data.requestedBy||'')+'</div><div style="font-size:8px;color:#888">'+(data.reqTitle||'')+'</div></td>'
+    +'<td style="padding:8px;border:1px solid #c8b89a;"><div style="font-weight:700;font-size:9px;color:#5a4a38;margin-bottom:4px;">Requested By</div><div style="border-bottom:1px solid #b89a6e;height:18px;margin-bottom:3px;"></div><div style="font-size:9px">'+(data.requestedBy||'')+'</div><div style="font-size:8px;color:#888">'+(data.reqTitle||'')+(data.reqEmail?' · '+data.reqEmail:'')+'</div></td>'
     +'<td style="padding:8px;border:1px solid #c8b89a;"><div style="font-weight:700;font-size:9px;color:#5a4a38;margin-bottom:4px;">Prepared By</div><div style="border-bottom:1px solid #b89a6e;height:18px;margin-bottom:3px;"></div><div style="font-size:9px">'+(data.prepBy||'')+'</div><div style="font-size:8px;color:#888">'+(data.prepTitle||'')+'</div></td>'
     +'</tr>';
 
@@ -1943,6 +1963,7 @@ window.loadDraft = function(){
     setVal('f-reqdate', data.requiredDate);
     setVal('f-remarks', data.remarks);
     setVal('f-reqby', data.requestedBy);
+    setVal('f-reqemail', data.reqEmail);
     setVal('sig-prep', data.prepBy);
     setVal('sig-prep-date', data.prepDate);
     setVal('sig-req-title', data.reqTitle);
