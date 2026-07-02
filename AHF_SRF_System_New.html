@@ -1124,6 +1124,8 @@ window.collectForm = function(){
 
 // ── SUBMIT ────────────────────────────────────────────────────────────────
 window.submitForm = async function(){
+  var btn = document.getElementById('submitFormBtn');
+  if(btn && btn.disabled) return; // already submitting — ignore extra clicks
   var data = window.collectForm();
   if(!data.project){ window.toast('Please enter a Project Name / Code','error'); return; }
   if(!data.materials||!data.materials.length){
@@ -1136,6 +1138,16 @@ window.submitForm = async function(){
   if(!hasData){
     window.toast('Please fill in at least one material row','error'); return;
   }
+  // Lock the button immediately so double-clicks / impatient re-clicks
+  // can never create a second submission while this one is in flight.
+  var originalBtnText = btn ? btn.textContent : '';
+  if(btn){
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = '⏳ Submitting... please wait';
+  }
+  window.toast('Submitting your request, please wait...','info',3000);
   // Locally-generated number is PROVISIONAL ONLY — used for display before
   // submit, and as an offline fallback. The real, collision-safe number is
   // assigned server-side by the SRF_Submit Power Automate flow.
@@ -1168,6 +1180,13 @@ window.submitForm = async function(){
     window.toast('✅ '+data.srfNo+' saved locally (SharePoint unavailable)','success',4000);
   }
   sessionStorage.setItem('lastSubmitted',data.srfNo);
+  // Reset button state before leaving the page (harmless if the page changes anyway)
+  if(btn){
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    btn.textContent = originalBtnText;
+  }
   // Reset form
   window.clearForm();
   // Go to dashboard
