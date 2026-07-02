@@ -676,6 +676,15 @@ let syncInterval = null;
 let lastSyncTime = null;
 let storageAvailable = false;
 
+// ── THROTTLE PROTECTION (added Jul 2026) ─────────────────────────────────
+// Prevents the dashboard from flooding the SRF_GetAll flow / SharePoint connector.
+let isFetching = false;            // single-flight lock: only 1 GetAll in the air at a time
+let lastFetchOk = 0;               // timestamp (ms) of last successful GetAll
+let consecutiveFailures = 0;       // circuit breaker counter
+const CACHE_TTL_MS      = 60000;   // reuse data if fetched < 60s ago (unless forced)
+const AUTO_SYNC_MS      = 180000;  // background auto-refresh every 3 minutes (visible tab only)
+const MAX_FAILURES      = 3;       // after 3 failures in a row, pause auto-sync (manual Sync Now resumes)
+
 window.setSyncStatus = function(state, msg){
   const dot=document.getElementById('syncDot');
   const msgEl=document.getElementById('syncMsg');
@@ -738,7 +747,15 @@ window.submitToSharePoint = async function(data){
 };
 
 // ── LOAD FROM SHAREPOINT ──────────────────────────────────────────────────
-window.loadFromSharePoint = async function(){
+window.loadFromSharePoint = async function(force){
+  // 1) Single-flight lock — never allow two GetAll calls in the air at once.
+  if(isFetching){ return null; }
+  // 2) Cache — if data is fresher than 60s and this isn't a forced refresh, reuse it.
+  if(!force && lastFetchOk && (Date.now() - lastFetchOk) < CACHE_TTL_MS){
+    setSyncStatus('live','Live — '+srfData.length+' SRFs (cached)');
+    return true;
+  }
+  isFetching = true;
   try{
     setSyncStatus('syncing','Loading from SharePoint...');
     const r = await fetch(PA_GETALL_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
@@ -777,13 +794,22 @@ window.loadFromSharePoint = async function(){
     });
     const now=new Date();
     lastSyncTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    lastFetchOk = Date.now();
+    consecutiveFailures = 0;
     setSyncStatus('live','Live — '+srfData.length+' SRFs loaded from SharePoint');
     return true;
   }catch(e){
     console.error('SharePoint load error:',e);
-    setSyncStatus('offline','SharePoint unavailable — using local data');
+    consecutiveFailures++;
+    if(consecutiveFailures >= MAX_FAILURES){
+      setSyncStatus('offline','SharePoint unavailable — auto-refresh paused. Click ↻ Sync Now to retry.');
+    } else {
+      setSyncStatus('offline','SharePoint unavailable — using local data');
+    }
     try{ srfData=JSON.parse(localStorage.getItem(STORAGE_KEY_DATA))||[]; }catch(ex){ srfData=[]; }
     return false;
+  }finally{
+    isFetching = false;
   }
 };
 
@@ -828,8 +854,10 @@ window.loadUsers = function(){
 }
 
 window.syncNow = async function(){
+  if(isFetching){ window.toast('Already refreshing — one moment...','info'); return; }
+  consecutiveFailures = 0;              // manual retry resumes auto-sync after a pause
   setSyncStatus('syncing','Loading from SharePoint...');
-  const ok = await window.loadFromSharePoint();
+  const ok = await window.loadFromSharePoint(true);  // force = bypass 60s cache
   if(ok){
     if(window.renderDashboard) window.renderDashboard();
     if(window.renderSummary && document.getElementById('page-summary') && document.getElementById('page-summary').style.display!=='none') window.renderSummary();
@@ -840,15 +868,26 @@ window.syncNow = async function(){
 }
 
 window.startAutoSync = async function(){
-  await window.loadFromSharePoint();
+  await window.loadFromSharePoint(true);   // initial load on login: always fresh
   window.generateSRFNumber();
   if(window.renderDashboard) window.renderDashboard();
   if(syncInterval) clearInterval(syncInterval);
   syncInterval=setInterval(async()=>{
-    await window.loadFromSharePoint();
-    if(document.getElementById('page-dashboard').style.display!=='none') window.renderDashboard();
-  }, 30000);
+    if(document.visibilityState !== 'visible') return;       // background tabs stay silent
+    if(consecutiveFailures >= MAX_FAILURES) return;          // circuit breaker: stop hammering a down server
+    const ok = await window.loadFromSharePoint();            // non-forced: respects cache + lock
+    if(ok && document.getElementById('page-dashboard').style.display!=='none') window.renderDashboard();
+  }, AUTO_SYNC_MS);
 }
+
+// When the user returns to a backgrounded tab, refresh once if data is stale.
+document.addEventListener('visibilitychange', async function(){
+  if(document.visibilityState !== 'visible') return;
+  if(!syncInterval) return;                                  // only when logged in / auto-sync active
+  if(consecutiveFailures >= MAX_FAILURES) return;
+  const ok = await window.loadFromSharePoint();              // cache decides if a real call is needed
+  if(ok && document.getElementById('page-dashboard') && document.getElementById('page-dashboard').style.display!=='none' && window.renderDashboard) window.renderDashboard();
+});
 
 window.seedUsers = function(){
   if(users.length) return;
