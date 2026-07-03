@@ -1241,29 +1241,25 @@ window.submitForm = async function(){
 
 
 window.clearForm = function(){
-  document.getElementById('f-rev').value='';
-  document.getElementById('f-project').value='';
-  document.getElementById('f-priority').value='';
-  document.getElementById('f-reqdate').value='';
-  document.getElementById('f-remarks').value='';
+  // Null-safe setter — a missing element must never crash the whole reset
+  var setV = function(id,v){ var el=document.getElementById(id); if(el) el.value=v; };
+  setV('f-rev','');            // legacy field — may not exist in current layout
+  setV('f-project','');
+  setV('f-priority','');
+  setV('f-reqdate','');
+  setV('f-remarks','');
   // Reset signature fields
-  var reqBy=document.getElementById('f-reqby');
-  var reqTitle=document.getElementById('sig-req-title');
-  var reqEmail=document.getElementById('f-reqemail');
-  var reqDate=document.getElementById('f-reqdate-sig');
-  if(reqBy) reqBy.value='';
-  if(reqTitle) reqTitle.value='';
-  if(reqEmail) reqEmail.value='';
-  if(reqDate) reqDate.value='';
+  setV('f-reqby','');
+  setV('sig-req-title','');
+  setV('f-reqemail','');
+  setV('f-reqdate-sig','');
   // Re-fill Prepared By from logged in user
-  var prepBy=document.getElementById('sig-prep');
-  var prepTitle=document.getElementById('sig-prep-title');
-  var prepDate=document.getElementById('sig-prep-date');
-  if(prepBy) prepBy.value=currentFullName||'';
-  if(prepTitle) prepTitle.value=currentJobTitle||'';
-  if(prepDate) prepDate.value=new Date().toISOString().slice(0,10);
+  setV('sig-prep', currentFullName||'');
+  setV('sig-prep-title', currentJobTitle||'');
+  setV('sig-prep-date', new Date().toISOString().slice(0,10));
   // Reset materials
-  document.getElementById('matBody').innerHTML='';
+  var mb=document.getElementById('matBody');
+  if(mb) mb.innerHTML='';
   imgCount=0;
   addMatRow();
   // Generate fresh SRF number
@@ -1290,7 +1286,9 @@ window.showPage = function(id){
   if(id==='summary')   window.renderSummary();
   if(id==='admin')     window.renderUsers();
   if(id==='submit'){
-    window.clearForm();
+    // NOTE: do NOT auto-clear the form here — people switch tabs mid-entry
+    // and must not lose their work. The form resets after a successful
+    // submit (in submitForm) or via the explicit Clear Form button.
     window.generateSRFNumber();
     // Check for saved draft
     try{
