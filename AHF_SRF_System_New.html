@@ -305,6 +305,8 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
 .role-mgr{background:#f3e8ff;color:#5b21b6;}
 .login-pw-wrap{position:relative;display:flex;align-items:center;}
 .login-pw-wrap input{width:100%;padding-right:36px;}
+.login-pw-toggle{position:absolute;right:1px;top:1px;height:31px;width:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;font-size:13px;padding:0;opacity:.6;}
+.login-pw-toggle:hover{opacity:1;}
 /* pw-toggle now inline */
 
 
@@ -2001,14 +2003,27 @@ window.saveDraft = function(){
   data.srfNo = document.getElementById('srfDisplay')?document.getElementById('srfDisplay').textContent:(document.getElementById('srfNumEl')?document.getElementById('srfNumEl').textContent:'DRAFT');
   data.isDraft = true;
   data.draftSavedAt = new Date().toISOString();
-  // Save to localStorage under draft key
-  try{ localStorage.setItem('ahf_srf_draft', JSON.stringify(data)); }catch(e){}
-  window.toast('💾 Draft saved! You can return to this later.','success',4000);
-  // Show draft indicator
+  var saved=false, droppedImages=false;
+  // Attempt 1: full draft including photos
+  try{ localStorage.setItem('ahf_srf_draft', JSON.stringify(data)); saved=true; }
+  catch(e){
+    // Likely storage quota exceeded (photos are large) — retry without images
+    try{
+      var slim = JSON.parse(JSON.stringify(data));
+      (slim.materials||[]).forEach(function(m){ m.img1=''; m.img2=''; });
+      localStorage.setItem('ahf_srf_draft', JSON.stringify(slim));
+      saved=true; droppedImages=true;
+    }catch(e2){ saved=false; }
+  }
   var ind = document.getElementById('draft-indicator');
-  if(ind){
-    ind.style.display='flex';
-    ind.textContent='💾 Draft saved at '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  if(saved && !droppedImages){
+    window.toast('💾 Draft saved! You can return to this later.','success',4000);
+    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+  } else if(saved && droppedImages){
+    window.toast('💾 Draft saved WITHOUT photos (images too large to store) — please re-attach them before submitting.','error',7000);
+    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+' (photos not included)'; }
+  } else {
+    window.toast('⚠️ Could not save draft — this browser is blocking local storage.','error',6000);
   }
 };
 
@@ -2053,6 +2068,16 @@ window.loadDraft = function(){
         setCell(6, m.quantity, false);
         setCell(7, m.status||m.reqStatus||'Requested', true);
         setCell(9, m.matRemarks, false);
+        // Restore photo if the draft has one
+        if(m.img1){
+          var rimgEl = tr.querySelector('[id^="rimg-"]');
+          if(rimgEl){
+            var uid = rimgEl.id.replace('rimg-','');
+            rimgEl.src = m.img1; rimgEl.style.display='block';
+            var pEl=document.getElementById('rprompt-'+uid); if(pEl) pEl.style.display='none';
+            var rmEl=document.getElementById('rrm-'+uid); if(rmEl) rmEl.style.display='flex';
+          }
+        }
       });
     }
     // Keep the stored draft until the SRF is actually submitted —
