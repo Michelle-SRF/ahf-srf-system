@@ -2061,7 +2061,7 @@ window.loadDraft = function(){
         setCell(1, m.materialName, false);
         setCell(2, m.materialType, false);
         setCell(3, m.colorFinish, false);
-        setCell(4, m.category, false);
+        setCell(4, m.glossy||m.category, false);
         setCell(5, m.sampleSize, false);
         setCell(6, m.quantity, false);
         setCell(7, m.status||m.reqStatus||'Requested', true);
