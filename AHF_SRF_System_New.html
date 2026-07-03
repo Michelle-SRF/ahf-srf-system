@@ -444,6 +444,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
     <h2>New Sample Request</h2>
     <div style="display:flex;gap:8px;">
       <button class="btn btn-secondary" onclick="window.clearForm()">🗑 Clear Form</button>
+      <button class="btn btn-secondary" onclick="window.saveDraft()">💾 Save Draft</button>
       <button class="btn btn-gold" onclick="window.generatePDF()">📋 Preview</button>
       <button class="btn btn-success" onclick="window.submitForm()" id="submitFormBtn">✅ Submit Request</button>
       <button class="btn btn-secondary" onclick="window.generatePDF()" style="background:#c62828;color:#fff;border:none;">🖨️ PDF</button>
@@ -1219,6 +1220,10 @@ window.submitForm = async function(){
     window.toast('✅ '+data.srfNo+' saved locally (SharePoint unavailable)','success',4000);
   }
   sessionStorage.setItem('lastSubmitted',data.srfNo);
+  // Submission succeeded — the draft has served its purpose, clear it.
+  try{ localStorage.removeItem('ahf_srf_draft'); }catch(e){}
+  var dInd=document.getElementById('draft-indicator');
+  if(dInd) dInd.style.display='none';
   // Reset button state before leaving the page (harmless if the page changes anyway)
   if(btn){
     btn.disabled = false;
@@ -2050,8 +2055,8 @@ window.loadDraft = function(){
         setCell(9, m.matRemarks, false);
       });
     }
-    // Clear the draft
-    localStorage.removeItem('ahf_srf_draft');
+    // Keep the stored draft until the SRF is actually submitted —
+    // if the browser closes after loading, the draft is still recoverable.
     window.toast('✅ Draft loaded!','success',3000);
     var ind=document.getElementById('draft-indicator');
     if(ind) ind.style.display='none';
