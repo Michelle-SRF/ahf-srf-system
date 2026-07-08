@@ -97,6 +97,8 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
 .info-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);margin-bottom:14px;}
 .info-cell{display:flex;align-items:stretch;border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:28px;}
 .info-cell:nth-child(even){border-right:none;}
+.field-err{border:1.5px solid #c62828 !important;background:#fff5f5 !important;border-radius:3px;}
+.req-star{color:#c62828;font-weight:bold;}
 .info-label{background:var(--label);color:var(--th);font-weight:700;font-size:9.5px;padding:4px 8px;min-width:130px;display:flex;align-items:center;border-right:1px solid var(--border);}
 .info-input{flex:1;border:none;outline:none;padding:4px 8px;font-size:10px;font-family:Arial,sans-serif;background:var(--white);color:var(--dark);width:100%;}
 .info-input:focus{background:#fff8ee;}
@@ -421,7 +423,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
   </div>
   <button class="fn-tab" id="fn-submit"    onclick="window.showPage('submit')">📋 New Request</button>
   <button class="fn-tab" id="fn-dashboard" onclick="window.showPage('dashboard')">📊 Dashboard</button>
-  <button class="fn-tab" id="fn-summary"   onclick="window.showPage('summary')">📈 Summary</button>
+  <button class="fn-tab" id="fn-summary" style="display:none;" onclick="window.showPage('summary')">📈 Summary</button>
   <button class="fn-tab" id="fn-edit"      onclick="window.showPage('edit')"      style="display:none">✏️ Edit / Update</button>
   <button class="fn-tab" id="fn-admin"     onclick="window.showPage('admin')"     style="display:none">⚙️ Admin</button>
   <div class="fn-right">
@@ -446,7 +448,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
     <h2>New Sample Request</h2>
     <div style="display:flex;gap:8px;">
       <button class="btn btn-secondary" onclick="window.clearForm()">🗑 Clear Form</button>
-      <button class="btn btn-secondary" onclick="window.saveDraft()">💾 Save Draft</button>
+      <button class="btn btn-secondary" id="saveDraftBtn" onclick="window.saveDraft()">💾 Save Draft</button>
       <button class="btn btn-gold" onclick="window.generatePDF()">📋 Preview</button>
       <button class="btn btn-success" onclick="window.submitForm()" id="submitFormBtn">✅ Submit Request</button>
       <button class="btn btn-secondary" onclick="window.generatePDF()" style="background:#c62828;color:#fff;border:none;">🖨️ PDF</button>
@@ -465,24 +467,28 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
       <div class="srf-no-display"><span class="srf-dot" id="srfDot"></span><span id="srfDisplay">Generating...</span></div>
     </div>
     <div class="info-cell">
-      <span class="info-label">Project Name / Code</span>
+      <span class="info-label">Project Name / Code&nbsp;<span class="req-star">*</span></span>
       <input class="info-input" type="text" id="f-project" placeholder="e.g. NAEM OFF">
     </div>
     
     <div class="info-cell">
-      <span class="info-label">Priority</span>
+      <span class="info-label">Priority&nbsp;<span class="req-star">*</span></span>
       <select class="info-input" id="f-priority">
         <option value="">-- Select --</option>
         <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
       </select>
     </div>
     <div class="info-cell">
-      <span class="info-label">Required Date</span>
+      <span class="info-label">Required Date&nbsp;<span class="req-star">*</span></span>
       <input class="info-input" type="date" id="f-reqdate">
     </div>
     <div class="info-cell" style="grid-column:1/-1;border-right:none;">
       <span class="info-label">Remarks / Notes</span>
       <input class="info-input" type="text" id="f-remarks" placeholder="Add any remarks, revision details, references or special instructions here...">
+    </div>
+    <div class="info-cell" style="grid-column:1/-1;border-right:none;border-top:1px solid var(--border);">
+      <span class="info-label">Additional Notes / Instructions</span>
+      <textarea class="info-input" id="f-addnotes" rows="3" placeholder="Additional instructions, delivery coordination, special handling... (this text is included in the notification email and on the PDF form)" style="resize:vertical;min-height:52px;line-height:1.5;"></textarea>
     </div>
   </div>
 
@@ -491,12 +497,12 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
     <table class="mat-table">
       <thead><tr>
         <th style="width:32px">No.</th>
-        <th style="width:160px">Code</th>
-        <th style="width:110px">Material Type</th>
-        <th style="width:120px">Color / Shade</th>
+        <th style="width:160px">Code <span class="req-star">*</span></th>
+        <th style="width:110px">Material Type <span class="req-star">*</span></th>
+        <th style="width:120px">Color / Shade <span class="req-star">*</span></th>
         <th style="width:70px">Glossy %</th>
-        <th style="width:90px">Sample Size</th>
-        <th style="width:45px">Qty</th>
+        <th style="width:90px">Sample Size <span class="req-star">*</span></th>
+        <th style="width:45px">Qty <span class="req-star">*</span></th>
         <th style="width:100px">Status</th>
         <th style="width:150px">Image / Files</th>
           <th style="width:100px">Remarks</th>
@@ -507,19 +513,34 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
   </div>
   <button class="btn btn-secondary" style="margin:6px 0 14px;display:inline-block;" onclick="window.addMatRow()">+ Add Row</button>
 
+  <!-- REQUEST-LEVEL ATTACHED FILES (v2 item 3) -->
+  <div id="reqFilesSection">
+    <div class="sec-hdr">Attached Files <span style="font-weight:normal;font-size:9px;opacity:.85;">— for the whole request</span></div>
+    <div style="border:1px solid var(--border);border-radius:4px;padding:10px;margin-bottom:14px;background:var(--white,#fff);">
+      <div style="border:1.5px dashed var(--accent);border-radius:4px;padding:14px;text-align:center;color:var(--accent);font-size:11px;position:relative;cursor:pointer;">
+        <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.dwg,.zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:1;" onchange="window.addRefFiles&&window.addRefFiles(this,'REQ')">
+        <div style="font-size:18px;">📎</div>
+        <div style="margin-top:3px;">Click to attach supporting files</div>
+        <div style="font-size:9px;margin-top:2px;color:var(--border)">PDF · Word · Excel · Images · DWG · ZIP — multiple files allowed</div>
+      </div>
+      <div id="rfl-REQ" style="margin-top:6px;"></div>
+      <div style="font-size:9px;color:var(--accent);margin-top:6px;opacity:.8;">Note: attached files are not stored in drafts — re-attach after loading a draft. Files are delivered to SharePoint with the request from Phase B onwards.</div>
+    </div>
+  </div>
+
     <div class="gold-rule"></div>
   <div class="sig-row">
     <div class="sig-cell">
       <div class="sig-lbl">Requested By</div>
-      <input class="sig-inp" id="f-reqby" placeholder="Full Name">
-      <input class="sig-inp" id="sig-req-title" placeholder="Job Title" style="margin-top:5px;">
-      <input class="sig-inp" id="f-reqemail" type="email" placeholder="Email (for CC on updates)" style="margin-top:5px;">
+      <input class="sig-inp" id="f-reqby" placeholder="Full Name *">
+      <input class="sig-inp" id="sig-req-title" placeholder="Job Title *" style="margin-top:5px;">
+      <input class="sig-inp" id="f-reqemail" type="email" placeholder="Email (for CC on updates) *" style="margin-top:5px;">
       <div class="sig-date-row"><label>Date</label><input type="date" id="f-reqdate-sig"></div>
     </div>
     <div class="sig-cell">
       <div class="sig-lbl">Prepared By</div>
-      <input class="sig-inp" id="sig-prep" placeholder="Full Name">
-      <input class="sig-inp" id="sig-prep-title" placeholder="Job Title" style="margin-top:5px;">
+      <input class="sig-inp" id="sig-prep" placeholder="Full Name *">
+      <input class="sig-inp" id="sig-prep-title" placeholder="Job Title *" style="margin-top:5px;">
       <div class="sig-date-row"><label>Date</label><input type="date" id="sig-prep-date"></div>
     </div>
   </div>
@@ -666,6 +687,7 @@ const REQ_STATUSES = ['Requested','Received','Approved','Rejected','Cancelled'];
 const CATS = ['Wood','Fabric','Metal','Glass','Stone','Laminate','Other'];
 
 let currentUser = null, currentRole = null, currentFullName = null, currentJobTitle = null;
+var refFilesStore = { REQ: [] };   // request-level attached files (was never declared — old per-row Files tab was broken)
 let srfData  = [];
 let users    = [];
 let imgCount = 0;
@@ -770,6 +792,7 @@ window.loadFromSharePoint = async function(force){
     function choiceVal(f){ return f&&typeof f==='object'?f.Value||'':f||''; }
     // Helper: SharePoint date fields - strip time portion for date-only fields
     function dateVal(f){ if(!f) return ''; var s=String(f); return s.split('T')[0]; }
+    var _pendingLocal = (srfData||[]).filter(function(r){ return r && r.pendingSync; });
     srfData = items.map(function(item){
       return {
         id:           item.ID||item.id,
@@ -795,11 +818,16 @@ window.loadFromSharePoint = async function(force){
         materials:    (function(){ try{ return JSON.parse(item.Materials_JSON||'[]'); }catch(e){ return []; } })()
       };
     });
+    // Re-attach any local-only (unsynced) submissions so they are never silently erased
+    if(_pendingLocal.length){
+      srfData = _pendingLocal.concat(srfData);
+      try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+    }
     const now=new Date();
     lastSyncTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     lastFetchOk = Date.now();
     consecutiveFailures = 0;
-    setSyncStatus('live','Live — '+srfData.length+' SRFs loaded from SharePoint');
+    setSyncStatus('live','Live — '+srfData.length+' SRFs loaded'+(_pendingLocal.length?' (⚠ '+_pendingLocal.length+' NOT SYNCED — re-submit them)':' from SharePoint'));
     return true;
   }catch(e){
     console.error('SharePoint load error:',e);
@@ -856,8 +884,13 @@ window.loadUsers = function(){
   try{ users=JSON.parse(localStorage.getItem(STORAGE_KEY_USERS))||[]; }catch(e){ users=[]; }
 }
 
+var _lastManualSync = 0;
 window.syncNow = async function(){
   if(isFetching){ window.toast('Already refreshing — one moment...','info'); return; }
+  if(Date.now() - _lastManualSync < 30000){
+    window.toast('Just refreshed — please wait a moment before syncing again.','info',3000); return;
+  }
+  _lastManualSync = Date.now();
   consecutiveFailures = 0;              // manual retry resumes auto-sync after a pause
   setSyncStatus('syncing','Loading from SharePoint...');
   const ok = await window.loadFromSharePoint(true);  // force = bypass 60s cache
@@ -1059,8 +1092,7 @@ window.addMatRow = function(){
     <td><select class="status-sel" style="border:none;outline:none;padding:4px 18px 4px 5px;font-size:9.5px;font-family:Arial,sans-serif;width:100%;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27%3E%3Cpath d=%27M0 0l5 6 5-6z%27 fill=%27%238a7a6a%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 4px center;background-size:7px;">${STATUSES.map(s=>`<option>${s}</option>`).join('')}</select></td>
     <td style="padding:3px;min-width:200px;vertical-align:top;">
       <div style="display:flex;gap:2px;margin-bottom:2px;position:relative;z-index:20;">
-        <button type="button" class="row-tab row-tab-active" id="rtab-img-${uid}" onclick="window.switchRowTab&&window.switchRowTab(event,'img','${uid}')">📷 Image</button>
-        <button type="button" class="row-tab" id="rtab-ref-${uid}" onclick="window.switchRowTab&&window.switchRowTab(event,'ref','${uid}')">📎 Files</button>
+        <button type="button" class="row-tab row-tab-active" id="rtab-img-${uid}">📷 Image</button>
       </div>
       <div id="rp-img-${uid}" style="border:1px solid var(--border);border-radius:0 4px 4px 4px;">
         <div id="rib-${uid}" style="width:100%;height:100px;border:2px dashed var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--label);cursor:pointer;position:relative;overflow:hidden;">
@@ -1069,14 +1101,6 @@ window.addMatRow = function(){
           <img id="rimg-${uid}" alt="" style="width:100%;height:100%;object-fit:contain;display:none;">
           <button type="button" id="rrm-${uid}" style="display:none;position:absolute;top:3px;right:3px;background:rgba(90,74,56,0.8);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;align-items:center;justify-content:center;z-index:3;line-height:1;" onclick="window.rmRowImg&&window.rmRowImg(event,'${uid}')">×</button>
         </div>
-      </div>
-      <div id="rp-ref-${uid}" style="display:none;border:1px solid var(--border);border-radius:0 4px 4px 4px;padding:4px;">
-        <div style="border:1.5px dashed var(--border);border-radius:4px;padding:8px;text-align:center;color:var(--accent);font-size:10px;position:relative;cursor:pointer;">
-          <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.dwg,.zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:1;" onchange="window.addRefFiles&&window.addRefFiles(this,'${uid}')">
-          <div>📎 Click to attach files</div>
-          <div style="font-size:9px;margin-top:2px;color:var(--border)">PDF · Word · Excel · Images · DWG</div>
-        </div>
-        <div id="rfl-${uid}" style="margin-top:4px;"></div>
       </div>
     </td>
     <td><textarea placeholder="Remarks..." rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="border:none;outline:none;padding:4px 5px;font-size:9.5px;font-family:Arial,sans-serif;width:100%;resize:none;overflow:hidden;min-height:28px;background:transparent;color:var(--dk,#3d3028);display:block;line-height:1.4;"></textarea></td>
@@ -1151,9 +1175,12 @@ window.collectForm = function(){
     priority:     document.getElementById('f-priority')?document.getElementById('f-priority').value:'',
     requiredDate: document.getElementById('f-reqdate')?document.getElementById('f-reqdate').value:'',
     remarks:      document.getElementById('f-remarks')?document.getElementById('f-remarks').value:'',
+    addNotes:     document.getElementById('f-addnotes')?document.getElementById('f-addnotes').value:'',
+    attachments:  (typeof refFilesStore!=='undefined' && refFilesStore['REQ'] ? refFilesStore['REQ'].map(function(f){return {name:f.name,size:f.size,ext:f.ext,data:f.data};}) : []),
     requestedBy:  document.getElementById('f-reqby')?document.getElementById('f-reqby').value:'',
     reqTitle:     document.getElementById('sig-req-title')?document.getElementById('sig-req-title').value:'',
     reqEmail:     document.getElementById('f-reqemail')?document.getElementById('f-reqemail').value:'',
+    reqSigDate:   document.getElementById('f-reqdate-sig')?document.getElementById('f-reqdate-sig').value:'',
     prepBy:       document.getElementById('sig-prep')?document.getElementById('sig-prep').value:'',
     prepTitle:    document.getElementById('sig-prep-title')?document.getElementById('sig-prep-title').value:'',
     prepDate:     document.getElementById('sig-prep-date')?document.getElementById('sig-prep-date').value:'',
@@ -1169,16 +1196,37 @@ window.submitForm = async function(){
   var btn = document.getElementById('submitFormBtn');
   if(btn && btn.disabled) return; // already submitting — ignore extra clicks
   var data = window.collectForm();
-  if(!data.project){ window.toast('Please enter a Project Name / Code','error'); return; }
+  // ── MANDATORY FIELD VALIDATION (v2 item 8) ──
+  // All fields required except: Glossy %, Remarks, Additional Notes, and images.
+  // Empty extra material rows block submission (fill or remove them).
+  var missing = [];
+  document.querySelectorAll('.field-err').forEach(function(el){ el.classList.remove('field-err'); });
+  function req(id){
+    var el = document.getElementById(id);
+    if(el && !String(el.value||'').trim()){ el.classList.add('field-err'); missing.push(el); }
+  }
+  req('f-project'); req('f-priority'); req('f-reqdate');
+  req('f-reqby'); req('sig-req-title'); req('f-reqemail'); req('f-reqdate-sig');
+  // Basic email sanity (only if filled)
+  var em = document.getElementById('f-reqemail');
+  if(em && em.value.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value.trim())){
+    em.classList.add('field-err'); missing.push(em);
+  }
+  // Material rows: every row must be complete (Glossy % td index 4 exempt; image exempt)
+  document.querySelectorAll('#matBody tr').forEach(function(tr){
+    [1,2,3,5,6].forEach(function(ci){
+      var td = tr.querySelectorAll('td')[ci]; if(!td) return;
+      var inp = td.querySelector('textarea,input[type="text"],input:not([type])');
+      if(inp && !String(inp.value||'').trim()){ inp.classList.add('field-err'); missing.push(inp); }
+    });
+  });
+  if(missing.length){
+    window.toast('Please complete the highlighted required fields ('+missing.length+' missing). Empty material rows must be filled or removed.','error',6000);
+    try{ missing[0].scrollIntoView({behavior:'smooth',block:'center'}); missing[0].focus(); }catch(e){}
+    return;
+  }
   if(!data.materials||!data.materials.length){
     window.toast('Please add at least one material','error'); return;
-  }
-  // Check if at least one field is filled in any row
-  var hasData = data.materials.some(function(m){
-    return m.materialName||m.materialType||m.colorFinish||m.sampleSize;
-  });
-  if(!hasData){
-    window.toast('Please fill in at least one material row','error'); return;
   }
   // Lock the button immediately so double-clicks / impatient re-clicks
   // can never create a second submission while this one is in flight.
@@ -1218,8 +1266,10 @@ window.submitForm = async function(){
     setSyncStatus('live','✅ Submitted to SharePoint');
     window.toast('✅ '+data.srfNo+' submitted to SharePoint!','success',4000);
   } else {
-    setSyncStatus('offline','Saved locally — SharePoint sync pending');
-    window.toast('✅ '+data.srfNo+' saved locally (SharePoint unavailable)','success',4000);
+    data.pendingSync = true;   // mark loudly: this record exists ONLY in this browser
+    try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+    setSyncStatus('offline','⚠ Saved in this browser only — NOT in SharePoint yet. Re-submit when back online.');
+    window.toast('⚠ '+data.srfNo+' saved in this browser ONLY — it is NOT in SharePoint. Please re-submit it once the connection is back.','error',9000);
   }
   sessionStorage.setItem('lastSubmitted',data.srfNo);
   // Submission succeeded — the draft has served its purpose, clear it.
@@ -1248,6 +1298,8 @@ window.clearForm = function(){
   setV('f-priority','');
   setV('f-reqdate','');
   setV('f-remarks','');
+  setV('f-addnotes','');
+  if(typeof refFilesStore!=='undefined'){ refFilesStore['REQ']=[]; var _rfl=document.getElementById('rfl-REQ'); if(_rfl) _rfl.innerHTML=''; }
   // Reset signature fields
   setV('f-reqby','');
   setV('sig-req-title','');
@@ -1497,7 +1549,7 @@ window.renderDashboard = function(){
       else overdueCell='<span style="background:#f8d7da;color:#842029;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;">'+diff+'d overdue</span>';
     }
     return `<tr onclick="window.openSRF('${srf.srfNo}')" style="cursor:pointer">
-      <td><strong>${srf.srfNo}</strong></td>
+      <td><strong>${srf.srfNo}</strong>${srf.pendingSync?' <span style="background:#c62828;color:#fff;font-size:8px;padding:1px 5px;border-radius:3px;font-weight:bold;">⚠ NOT SYNCED</span>':''}</td>
       <td>${srf.date||'—'}</td>
       <td>${srf.project||'—'}</td>
       <td>${srf.requestedBy||'—'}</td>
@@ -1996,11 +2048,12 @@ window.clearDraftIndicator = function(){
   if(ind) ind.style.display='none';
 };
 
-window.saveDraft = function(){
+window.saveDraft = function(auto){
   var data = window.collectForm();
   data.srfNo = document.getElementById('srfDisplay')?document.getElementById('srfDisplay').textContent:(document.getElementById('srfNumEl')?document.getElementById('srfNumEl').textContent:'DRAFT');
   data.isDraft = true;
   data.draftSavedAt = new Date().toISOString();
+  delete data.attachments;   // files are never stored in drafts (size + staleness)
   var saved=false, droppedImages=false;
   // Attempt 1: full draft including photos
   try{ localStorage.setItem('ahf_srf_draft', JSON.stringify(data)); saved=true; }
@@ -2014,16 +2067,51 @@ window.saveDraft = function(){
     }catch(e2){ saved=false; }
   }
   var ind = document.getElementById('draft-indicator');
+  var t = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  if(auto){
+    // Autosave: quiet — indicator only, never toasts
+    if(saved && ind){ ind.style.display='flex'; ind.textContent='💾 Autosaved at '+t+(droppedImages?' (photos not included)':''); }
+    return saved;
+  }
+  // Manual save: button feedback + toasts
+  var btn = document.getElementById('saveDraftBtn');
+  if(saved && btn){
+    var orig = btn.textContent;
+    btn.textContent = '✓ Saved';
+    btn.style.background = '#2e7d32'; btn.style.color = '#fff';
+    setTimeout(function(){ btn.textContent = orig; btn.style.background=''; btn.style.color=''; }, 2000);
+  }
   if(saved && !droppedImages){
     window.toast('💾 Draft saved! You can return to this later.','success',4000);
-    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+t; }
   } else if(saved && droppedImages){
     window.toast('💾 Draft saved WITHOUT photos (images too large to store) — please re-attach them before submitting.','error',7000);
-    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+' (photos not included)'; }
+    if(ind){ ind.style.display='flex'; ind.textContent='💾 Draft saved at '+t+' (photos not included)'; }
   } else {
     window.toast('⚠️ Could not save draft — this browser is blocking local storage.','error',6000);
   }
+  return saved;
 };
+
+// ── AUTOSAVE (v2 item 5) ─────────────────────────────────────────────
+// Every 60s, silently save the form as a draft — but only when logged in
+// and only if the form actually has content (never overwrite a real draft
+// with an empty form).
+window.formHasContent = function(){
+  try{
+    var d = window.collectForm();
+    if((d.project||'').trim() || (d.remarks||'').trim()) return true;
+    return (d.materials||[]).some(function(m){
+      return (m.materialName||'').trim() || (m.materialType||'').trim() ||
+             (m.colorFinish||'').trim() || (m.sampleSize||'').trim() || m.img1;
+    });
+  }catch(e){ return false; }
+};
+setInterval(function(){
+  if(!currentUser) return;                 // only when logged in
+  if(!window.formHasContent()) return;     // never save an empty form
+  try{ window.saveDraft(true); }catch(e){}
+}, 60000);
 
 window.loadDraft = function(){
   try{
@@ -2038,8 +2126,10 @@ window.loadDraft = function(){
     setVal('f-priority', data.priority);
     setVal('f-reqdate', data.requiredDate);
     setVal('f-remarks', data.remarks);
+    setVal('f-addnotes', data.addNotes);
     setVal('f-reqby', data.requestedBy);
     setVal('f-reqemail', data.reqEmail);
+    setVal('f-reqdate-sig', data.reqSigDate);
     setVal('sig-prep', data.prepBy);
     setVal('sig-prep-date', data.prepDate);
     setVal('sig-req-title', data.reqTitle);
