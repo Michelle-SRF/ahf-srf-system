@@ -754,7 +754,13 @@ window.submitToSharePoint = async function(data){
       submittedAt:   data.submittedAt||new Date().toISOString(),
       isDraft:       data.isDraft||false,
       overallStatus: 'Open',
-      materialsJson: JSON.stringify(data.materials||[])
+      materialsJson: JSON.stringify(data.materials||[]),
+      // Reference files: name + extension + clean base64 (data-URI prefix stripped)
+      // The flow saves these into the SharePoint SRF_Files library, one folder per SRF.
+      attachmentsJson: JSON.stringify((data.attachments||[]).map(function(f){
+        return { name: f.name, ext: f.ext, data: String(f.data||'').split(',').pop() };
+      })),
+      attachmentCount: (data.attachments||[]).length
     };
     const r = await fetch(PA_SUBMIT_URL, {
       method:'POST',
@@ -1955,7 +1961,19 @@ window.addRefFiles = function(input, uid){
   if(!refFilesStore[uid]) refFilesStore[uid]=[];
   const list=document.getElementById('rfl-'+uid);
   if(!list) return;
+  // ── SIZE CAPS: 10MB per file, 20MB total per request ──
+  var MAX_FILE = 10*1048576, MAX_TOTAL = 20*1048576;
+  var currentTotal = refFilesStore[uid].reduce(function(t,f){ return t + (f.rawSize||0); }, 0);
   Array.from(input.files).forEach(file=>{
+    if(file.size > MAX_FILE){
+      window.toast('⚠ "'+file.name+'" is over the 10MB per-file limit and was not added.','error',6000);
+      return;
+    }
+    if(currentTotal + file.size > MAX_TOTAL){
+      window.toast('⚠ Adding "'+file.name+'" would exceed the 20MB total attachment limit for this request.','error',6000);
+      return;
+    }
+    currentTotal += file.size;
     const id=uid+'_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const ext=file.name.split('.').pop().toLowerCase();
     const icon={'pdf':'📄','doc':'📝','docx':'📝','xls':'📊','xlsx':'📊',
@@ -1964,7 +1982,7 @@ window.addRefFiles = function(input, uid){
     const attNo=refFilesStore[uid].length+1;
     const reader=new FileReader();
     reader.onload=ev=>{
-      refFilesStore[uid].push({id,name:file.name,size,icon,data:ev.target.result,ext,attNo});
+      refFilesStore[uid].push({id,name:file.name,size,icon,data:ev.target.result,ext,attNo,rawSize:file.size});
       const div=document.createElement('div');
       div.id='rfi-'+id;
       div.style.cssText='display:flex;align-items:center;gap:6px;padding:4px 6px;background:var(--alt);border-radius:3px;margin-bottom:4px;font-size:9.5px;';
@@ -2045,6 +2063,10 @@ window.generatePDF = function(){
     +'<tbody>'+matRows+'</tbody></table>'
     +'<div class="sh" style="margin-top:10px;">Signatures</div>'
     +'<table><tbody>'+sigRows+'</tbody></table>'
+    +((data.attachments&&data.attachments.length) ? '<div class="sh" style="margin-top:10px;">Reference Files ('+data.attachments.length+')</div>'
+      +'<div style="border:1px solid #c8b89a;background:#fdfbf7;padding:6px 8px;font-size:9.5px;line-height:1.7;">'
+      +data.attachments.map(function(f,i){ return '&#128206; <strong>Attachment '+(i+1)+':</strong> '+f.name+(f.size?' &middot; '+f.size:''); }).join('<br>')
+      +'</div>' : '')
     +'<div style="text-align:center;font-style:italic;color:#b89a6e;font-size:8px;margin-top:12px;padding-top:8px;border-top:1px solid #c8b89a;">Design Studio by Al Huzaifa — Sample Request / Material Reference Form</div>';
 
   var fullHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+(data.srfNo||'SRF')+'</title><style>'+css+'</style></head><body>'+bodyHTML+'<'+'script>window.onload=function(){window.print();};<'+'/script></body></html>';
