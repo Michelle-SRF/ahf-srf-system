@@ -807,6 +807,7 @@ window.loadFromSharePoint = async function(force){
         priority:     choiceVal(item.Priority),
         requiredDate: dateVal(item.RequiredDate||item.Required_Date),
         remarks:      item.Remarks||'',
+        addNotes:     item.Additional_Notes||item.AdditionalNotes||item.Add_Notes||'',
         prepBy:       item.Prepared_By||'',
         prepTitle:    item.Prepared_By_JobTitle||'',
         prepDate:     dateVal(item.Prepared_At),
@@ -1263,6 +1264,14 @@ window.submitForm = async function(){
       if(idx===-1) idx = srfData.length-1;
       srfData[idx] = data;
       try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+    } else {
+      // Flow accepted the submission but returned no final number — drop the
+      // provisionally-numbered local copy; the forced refresh below will pull
+      // the authoritative record (with its real number) from SharePoint.
+      var pidx = srfData.indexOf(data);
+      if(pidx>-1) srfData.splice(pidx,1);
+      try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+      console.warn('SRF_Submit flow returned no srfNo in its Response — check the flow\'s Response action returns {"srfNo": ..., "itemId": ...}');
     }
     setSyncStatus('live','✅ Submitted to SharePoint');
     window.toast('✅ '+data.srfNo+' submitted to SharePoint!','success',4000);
@@ -1288,6 +1297,12 @@ window.submitForm = async function(){
   window.clearForm();
   // Go to dashboard
   window.showPage('dashboard');
+  // Always show the server's truth after a submit — bypass the 60s cache so
+  // the record appears under its REAL server-assigned number, not the provisional one.
+  window.loadFromSharePoint(true).then(function(){
+    var dash = document.getElementById('page-dashboard');
+    if(dash && dash.style.display !== 'none') window.renderDashboard();
+  });
 }
 
 
@@ -1983,7 +1998,12 @@ window.rmRefFile = function(uid, id){
 // ─────────────────────────────────────────────────────────────────────────
 
 window.generatePDF = function(){
-  var srf = editingSRF ? srfData.find(function(s){ return s.srfNo===editingSRF; }) : null;
+  // Data source is decided by the ACTIVE PAGE, not by stale editingSRF state:
+  // on the New Request page always render the live form; only use the stored
+  // record when actually viewing/editing an existing SRF.
+  var submitPage = document.getElementById('page-submit');
+  var onSubmitPage = submitPage && submitPage.style.display !== 'none';
+  var srf = (!onSubmitPage && editingSRF) ? srfData.find(function(s){ return s.srfNo===editingSRF; }) : null;
   var data = srf || window.collectForm();
   var mats = data.materials || [];
   var logoSrc = document.getElementById('ahf-logo-src') ? document.getElementById('ahf-logo-src').src : '';
@@ -2018,6 +2038,8 @@ window.generatePDF = function(){
     +'<div class="c"><span class="l">Required Date</span><span class="v">'+(data.requiredDate||'—')+'</span></div>'
     +'<div class="c cf"><span class="l">Remarks</span><span class="v">'+(data.remarks||'—')+'</span></div>'
     +'</div>'
+    +(data.addNotes ? '<div class="sh">Additional Notes &amp; Instructions</div>'
+      +'<div style="border:1px solid #c8b89a;background:#fdfbf7;padding:8px;font-size:9.5px;line-height:1.5;white-space:pre-wrap;">'+data.addNotes+'</div>' : '')
     +'<div class="sh">Material Details</div>'
     +'<table><thead><tr><th>No.</th><th>Code</th><th>Type</th><th>Color/Shade</th><th>Glossy%</th><th>Size</th><th>Qty</th><th>Status</th><th>Image</th><th>Remarks</th></tr></thead>'
     +'<tbody>'+matRows+'</tbody></table>'
