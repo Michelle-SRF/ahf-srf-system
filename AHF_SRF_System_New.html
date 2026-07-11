@@ -768,6 +768,22 @@ window.startEditSRF = function(srfNo){
   if(disp) disp.textContent = srf.srfNo + '  —  ✏️ EDITING (will become Rev ' + (editingSubmittedSRF.revision+1) + ')';
   var btn = document.getElementById('submitFormBtn');
   if(btn) btn.innerHTML = '💾 Save Changes (Rev ' + (editingSubmittedSRF.revision+1) + ')';
+  // Reassure editors: attached files already in SharePoint are safe — edits only ADD files
+  var noteEl = document.getElementById('attachEditNote');
+  if(!noteEl){
+    var sec = document.getElementById('reqFilesSection');
+    if(sec){
+      noteEl = document.createElement('div');
+      noteEl.id = 'attachEditNote';
+      noteEl.style.cssText = 'font-size:11px;color:#8B5E3C;background:#faf3e8;border:1px solid #e0cdb2;border-radius:6px;padding:6px 10px;margin:4px 0 8px;';
+      var hdr = sec.querySelector('.sec-hdr');
+      if(hdr && hdr.nextSibling){ sec.insertBefore(noteEl, hdr.nextSibling); } else { sec.appendChild(noteEl); }
+    }
+  }
+  if(noteEl){
+    noteEl.innerHTML = '📎 <strong>Existing attachments are preserved</strong> — files already submitted with this request stay in SharePoint. Anything you attach here will be <strong>added</strong> alongside them.';
+    noteEl.style.display = 'block';
+  }
   window.toast('✏️ Editing '+srf.srfNo+' — make your changes and click Save Changes.','success',4000);
 };
 
@@ -908,6 +924,7 @@ window.loadFromSharePoint = async function(force){
         requestedBy:  item.Requested_By||'',
         reqTitle:     item.ReqJobTitle||item.Requested_By_JobTitle||'',
         reqEmail:     item.ReqEmail||item.Requested_By_Email||'',
+        reqSigDate:   dateVal(item.SubmittedAt||item.Submission_Date||item.SRF_Date),
         priority:     choiceVal(item.Priority),
         requiredDate: dateVal(item.RequiredDate||item.Required_Date),
         remarks:      item.Remarks||'',
@@ -1452,6 +1469,7 @@ window.clearForm = function(){
   editingSubmittedSRF = null;
   var sfb = document.getElementById('submitFormBtn');
   if(sfb) sfb.innerHTML = '✅ Submit Request';
+  var aen = document.getElementById('attachEditNote'); if(aen) aen.style.display='none';
   // Null-safe setter — a missing element must never crash the whole reset
   var setV = function(id,v){ var el=document.getElementById(id); if(el) el.value=v; };
   setV('f-rev','');            // legacy field — may not exist in current layout
