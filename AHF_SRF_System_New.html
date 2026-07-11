@@ -755,12 +755,23 @@ window.submitToSharePoint = async function(data){
       isDraft:       data.isDraft||false,
       overallStatus: 'Open',
       materialsJson: JSON.stringify(data.materials||[]),
-      // Reference files: name + extension + clean base64 (data-URI prefix stripped)
-      // The flow saves these into the SharePoint SRF_Files library, one folder per SRF.
-      attachmentsJson: JSON.stringify((data.attachments||[]).map(function(f){
-        return { name: f.name, ext: f.ext, data: String(f.data||'').split(',').pop() };
-      })),
-      attachmentCount: (data.attachments||[]).length
+      // Reference files + material row images: name + extension + clean base64
+      // (data-URI prefix stripped). The flow saves all of these into the
+      // SharePoint SRF_Files library, one folder per SRF.
+      attachmentsJson: JSON.stringify(
+        (data.attachments||[]).map(function(f){
+          return { name: f.name, ext: f.ext, data: String(f.data||'').split(',').pop() };
+        }).concat(
+          (data.materials||[]).map(function(m,i){
+            if(!m.img1) return null;
+            var mime = (String(m.img1).match(/^data:image\/(\w+)/)||[])[1]||'png';
+            if(mime==='jpeg') mime='jpg';
+            var tag = (m.materialName||'').replace(/[^\w\-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30);
+            return { name: 'Material_'+(i+1)+(tag?'_'+tag:'')+'.'+mime, ext: mime, data: String(m.img1).split(',').pop() };
+          }).filter(function(x){ return x!==null; })
+        )
+      ),
+      attachmentCount: (data.attachments||[]).length + (data.materials||[]).filter(function(m){ return !!m.img1; }).length
     };
     const r = await fetch(PA_SUBMIT_URL, {
       method:'POST',
