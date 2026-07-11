@@ -728,6 +728,92 @@ window.setSyncStatus = function(state, msg){
 const PA_SUBMIT_URL    = 'https://defaultde468fa9dfee42d5bd38a4a7d32047.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/2bada66a52934db49eb0913e2d17bf0e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=cBkIZRpjuBIS88v-6Ga7WHqfaSS0GTw8EhqVDmPHDQI';
 const PA_GETALL_URL    = 'https://defaultde468fa9dfee42d5bd38a4a7d32047.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/93defdab623642afb24eee58ed98d61a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=M1M53ZGNGv8iwR6dT0qwm9xPBHbKnLh5yfieTwHxVHQ';
 const PA_UPDATE_URL    = 'https://defaultde468fa9dfee42d5bd38a4a7d32047.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/67f1623ce3864374b79c17bdf90d7ed6/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=oJNRItpQeWmL4fCIGa_nRMI_z0-1yJ0xCE4egRZKgO8';
+// SRF_Edit flow (full edit after submission) — paste the HTTP trigger URL here once the flow is built:
+const PA_EDIT_URL      = '';
+
+// ── FULL EDIT AFTER SUBMISSION (v2 Item 1) ─────────────────────────────
+// Lock rule (approved): editing permitted only while the request is Open
+// and within 48 hours of submission; Admin may unlock with an audit reason.
+var editingSubmittedSRF = null; // {srfNo, id, revision, reason} when in edit mode
+
+window.canEditSRF = function(srf){
+  var isOpen   = (srf.overallStatus||'Open')==='Open';
+  var subAt    = srf.submittedAt ? new Date(srf.submittedAt).getTime() : 0;
+  var within48 = !!subAt && (Date.now()-subAt) <= 48*3600*1000;
+  return { base: isOpen && within48, isOpen: isOpen, within48: within48, isAdmin: currentRole==='admin' };
+};
+
+window.startEditSRF = function(srfNo){
+  var srf = srfData.find(function(s){ return s.srfNo===srfNo; });
+  if(!srf){ window.toast('SRF not found','error'); return; }
+  if(!srf.id){ window.toast('⚠ This record has no SharePoint ID yet — refresh the dashboard first.','error',5000); return; }
+  var chk = window.canEditSRF(srf);
+  var reason = '';
+  if(!chk.base){
+    if(!chk.isAdmin){
+      var why = !chk.isOpen ? 'it is no longer Open' : 'the 48-hour edit window has passed';
+      window.toast('🔒 This request is locked for editing — '+why+'. Ask an Admin to unlock.','error',6000);
+      return;
+    }
+    reason = prompt('🔓 ADMIN UNLOCK — this request is locked ('+(!chk.isOpen?'not Open':'past 48h window')+').\n\nEnter a reason for the audit trail:');
+    if(!reason || !reason.trim()){ window.toast('Unlock cancelled — a reason is required.','error'); return; }
+  }
+  editingSubmittedSRF = { srfNo: srf.srfNo, id: srf.id, revision: parseInt(srf.revision||0,10), reason: reason.trim() };
+  window.showPage('submit');
+  window.clearForm();
+  // clearForm resets edit mode — restore it after
+  editingSubmittedSRF = { srfNo: srf.srfNo, id: srf.id, revision: parseInt(srf.revision||0,10), reason: reason.trim() };
+  window.populateFormFromRecord(srf);
+  var disp = document.getElementById('srfDisplay');
+  if(disp) disp.textContent = srf.srfNo + '  —  ✏️ EDITING (will become Rev ' + (editingSubmittedSRF.revision+1) + ')';
+  var btn = document.getElementById('submitFormBtn');
+  if(btn) btn.innerHTML = '💾 Save Changes (Rev ' + (editingSubmittedSRF.revision+1) + ')';
+  window.toast('✏️ Editing '+srf.srfNo+' — make your changes and click Save Changes.','success',4000);
+};
+
+window.submitEditToSharePoint = async function(data){
+  if(!PA_EDIT_URL){
+    window.toast('⚠ The SRF_Edit flow is not configured yet — paste its URL into PA_EDIT_URL.','error',7000);
+    return {ok:false};
+  }
+  try{
+    const payload = {
+      itemId:        parseInt(editingSubmittedSRF.id,10),
+      srfNo:         editingSubmittedSRF.srfNo,
+      revision:      editingSubmittedSRF.revision + 1,
+      editReason:    editingSubmittedSRF.reason||'',
+      editedBy:      currentFullName||currentUser||'',
+      editedAt:      new Date().toISOString(),
+      project:       data.project||'',
+      priority:      data.priority||'',
+      requiredDate:  data.requiredDate||'',
+      remarks:       data.remarks||'',
+      addNotes:      data.addNotes||'',
+      requestedBy:   data.requestedBy||'',
+      reqTitle:      data.reqTitle||'',
+      reqEmail:      data.reqEmail||'',
+      prepBy:        data.prepBy||'',
+      prepTitle:     data.prepTitle||'',
+      materialsJson: JSON.stringify(data.materials||[]),
+      attachmentsJson: JSON.stringify(
+        (data.attachments||[]).map(function(f){
+          return { name: f.name, ext: f.ext, data: String(f.data||'').split(',').pop() };
+        }).concat(
+          (data.materials||[]).map(function(m,i){
+            if(!m.img1 || String(m.img1).indexOf('data:')!==0) return null;
+            var mime = (String(m.img1).match(/^data:image\/(\w+)/)||[])[1]||'png';
+            if(mime==='jpeg') mime='jpg';
+            var tag = (m.materialName||'').replace(/[^\w\-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30);
+            return { name: 'Rev'+(editingSubmittedSRF.revision+1)+'_Material_'+(i+1)+(tag?'_'+tag:'')+'.'+mime, ext: mime, data: String(m.img1).split(',').pop() };
+          }).filter(function(x){ return x!==null; })
+        )
+      ),
+      attachmentCount: (data.attachments||[]).length + (data.materials||[]).filter(function(m){ return m.img1 && String(m.img1).indexOf('data:')===0; }).length
+    };
+    const r = await fetch(PA_EDIT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return {ok: r.ok};
+  }catch(e){ console.error('SRF edit error:',e); return {ok:false}; }
+};
 
 window.cloudGet = async function(key){ return null; }
 window.cloudSet = async function(key,val){ return false; }
@@ -817,19 +903,22 @@ window.loadFromSharePoint = async function(force){
         srfNo:        item.Title||'',
         date:         dateVal(item.Submission_Date||item.SRF_Date),
         revNo:        item.Revision_No||'',
+        revision:     parseInt(item.RevisionNo||item.Revision_No||'0',10)||0,
         project:      item.ProjectNameorCode||item.Project_Name_or_Code||'',
         requestedBy:  item.Requested_By||'',
-        reqTitle:     item.Requested_By_JobTitle||'',
-        reqEmail:     item.Requested_By_Email||'',
+        reqTitle:     item.ReqJobTitle||item.Requested_By_JobTitle||'',
+        reqEmail:     item.ReqEmail||item.Requested_By_Email||'',
         priority:     choiceVal(item.Priority),
         requiredDate: dateVal(item.RequiredDate||item.Required_Date),
         remarks:      item.Remarks||'',
         addNotes:     item.Additional_Notes||item.AdditionalNotes||item.Add_Notes||'',
         prepBy:       item.Prepared_By||'',
-        prepTitle:    item.Prepared_By_JobTitle||'',
+        prepTitle:    item.PrepJobTitle||item.Prepared_By_JobTitle||'',
         prepDate:     dateVal(item.Prepared_At),
         submittedBy:  item.Submittedby||item.Submitted_By||item.Last_Updated_By||'',
-        submittedAt:  item.Submitted_At||item.Last_Updated_At||'',
+        // 48h edit-window clock: true submission time only — NEVER Last_Updated_At,
+        // which changes on every status update and would re-open the edit window.
+        submittedAt:  item.SubmittedAt||item.Submitted_At||item.Submission_Date||item.SRF_Date||'',
         isDraft:      item.Is_Draft||false,
         overallStatus:choiceVal(item.OverallStatus||item.Overall_Status)||'Open',
         lastUpdatedBy:item.Last_Updated_By||'',
@@ -1257,6 +1346,41 @@ window.submitForm = async function(){
     btn.textContent = '⏳ Submitting... please wait';
   }
   window.toast('Submitting your request, please wait...','info',3000);
+
+  // ── EDIT MODE (full edit after submission, v2 Item 1) ──
+  if(editingSubmittedSRF){
+    setSyncStatus('syncing','Saving changes to SharePoint...');
+    const edResult = await window.submitEditToSharePoint(data);
+    if(edResult.ok){
+      // Update the local record in place
+      var rec = srfData.find(function(s){ return s.srfNo===editingSubmittedSRF.srfNo; });
+      if(rec){
+        ['project','priority','requiredDate','remarks','addNotes','requestedBy','reqTitle','reqEmail','prepBy','prepTitle','materials'].forEach(function(k){ rec[k]=data[k]; });
+        rec.revision = editingSubmittedSRF.revision + 1;
+        rec.editHistory = (rec.editHistory||[]).concat([{ by: currentFullName||currentUser||'', at: new Date().toISOString(), reason: editingSubmittedSRF.reason||'' }]);
+        try{ localStorage.setItem('ahf_srf_data_v1',JSON.stringify(srfData)); }catch(e){}
+      }
+      setSyncStatus('live','✅ Changes saved');
+      window.toast('✅ '+editingSubmittedSRF.srfNo+' updated — now Rev '+(editingSubmittedSRF.revision+1)+'!','success',5000);
+      editingSubmittedSRF = null;
+      window.clearForm();
+      window.showPage('dashboard');
+      window.loadFromSharePoint(true).then(function(){
+        var dash = document.getElementById('page-dashboard');
+        if(dash && dash.style.display !== 'none') window.renderDashboard();
+      });
+    } else {
+      setSyncStatus('error','Save failed');
+      window.toast('❌ Could not save changes — please try again. Your edits are still in the form.','error',7000);
+    }
+    if(btn){
+      btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer';
+      // On success clearForm already restored the label; on failure keep Save Changes
+      if(editingSubmittedSRF) btn.innerHTML = '💾 Save Changes (Rev '+(editingSubmittedSRF.revision+1)+')';
+    }
+    return;
+  }
+
   // Locally-generated number is PROVISIONAL ONLY — used for display before
   // submit, and as an offline fallback. The real, collision-safe number is
   // assigned server-side by the SRF_Submit Power Automate flow.
@@ -1324,6 +1448,10 @@ window.submitForm = async function(){
 
 
 window.clearForm = function(){
+  // Leaving the form always exits edit mode and restores the submit button
+  editingSubmittedSRF = null;
+  var sfb = document.getElementById('submitFormBtn');
+  if(sfb) sfb.innerHTML = '✅ Submit Request';
   // Null-safe setter — a missing element must never crash the whole reset
   var setV = function(id,v){ var el=document.getElementById(id); if(el) el.value=v; };
   setV('f-rev','');            // legacy field — may not exist in current layout
@@ -1672,9 +1800,19 @@ window.openSRF = function(srfNo){
   var actEl = document.getElementById('editActions');
   if(actEl){
     var saveBtn = (canReq||canRcv) ? '<button class="btn btn-success" onclick="window.saveEdits()">&#x1F4BE; Save Changes</button> ' : '';
+    // Full edit (v2 Item 1): Open + within 48h, or Admin unlock with audit reason
+    var editBtn = '';
+    if(canReq || currentRole==='designer'){
+      var chk = window.canEditSRF(srf);
+      if(chk.base){
+        editBtn = '<button class="btn btn-gold" onclick="window.startEditSRF(this.dataset.srf)" data-srf="'+srfNo+'">&#x270F;&#xFE0F; Edit Request</button> ';
+      } else if(chk.isAdmin){
+        editBtn = '<button class="btn btn-secondary" onclick="window.startEditSRF(this.dataset.srf)" data-srf="'+srfNo+'" title="Locked — admin unlock with audit reason">&#x1F513; Admin Edit</button> ';
+      }
+    }
     var xlsBtn = '<button class="btn btn-gold" onclick="window.exportSingleToExcel(this.dataset.srf)" data-srf="'+srfNo+'">&#x1F4E5; Excel</button> ';
     var pdfBtn = '<button class="btn btn-red" onclick="window.generatePDF()">&#x1F5A8; PDF</button>';
-    actEl.innerHTML = saveBtn + xlsBtn + pdfBtn;
+    actEl.innerHTML = saveBtn + editBtn + xlsBtn + pdfBtn;
   }
 
   // Build detail info
@@ -2169,14 +2307,8 @@ setInterval(function(){
   try{ window.saveDraft(true); }catch(e){}
 }, 60000);
 
-window.loadDraft = function(){
-  try{
-    var draft = localStorage.getItem('ahf_srf_draft');
-    if(!draft) return;
-    var data = JSON.parse(draft);
-    if(!data||!data.isDraft) return;
-    if(!confirm('You have a saved draft from '+new Date(data.draftSavedAt).toLocaleString('en-GB')+'. Would you like to load it?')) return;
-    // Fill form fields
+window.populateFormFromRecord = function(data){
+    // Fill form fields (shared by Load Draft and Edit Request)
     var setVal = function(id,val){ var el=document.getElementById(id); if(el&&val) el.value=val; };
     setVal('f-project', data.project);
     setVal('f-priority', data.priority);
@@ -2224,6 +2356,16 @@ window.loadDraft = function(){
         }
       });
     }
+};
+
+window.loadDraft = function(){
+  try{
+    var draft = localStorage.getItem('ahf_srf_draft');
+    if(!draft) return;
+    var data = JSON.parse(draft);
+    if(!data||!data.isDraft) return;
+    if(!confirm('You have a saved draft from '+new Date(data.draftSavedAt).toLocaleString('en-GB')+'. Would you like to load it?')) return;
+    window.populateFormFromRecord(data);
     // Keep the stored draft until the SRF is actually submitted —
     // if the browser closes after loading, the draft is still recoverable.
     window.toast('✅ Draft loaded!','success',3000);
