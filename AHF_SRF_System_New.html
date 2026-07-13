@@ -402,9 +402,6 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
     </div>
     <button class="btn-login" onclick="window.doLogin()">Sign In</button>
     <div class="login-err" id="loginErr">Invalid username or password.</div>
-    <div style="margin-top:12px;text-align:center;font-size:9px;color:var(--accent);">
-      Demo accounts: <strong>admin</strong> / admin123 &nbsp;·&nbsp; <strong>jefna</strong> / ahf2026
-    </div>
   </div>
 </div>
 
@@ -429,6 +426,7 @@ body{font-family:Arial,sans-serif;font-size:12px;background:var(--bg);color:var(
   <div class="fn-right">
     <span class="fn-user" id="fnUser"></span>
     <span class="fn-role-badge" id="fnRole"></span>
+    <button class="fn-logout" onclick="window.changeMyPassword()" title="Change your password" style="margin-right:6px;">🔑</button>
     <button class="fn-logout" onclick="window.doLogout()">Sign Out</button>
   </div>
 </div>
@@ -1556,6 +1554,7 @@ window.renderUsers = function(){
       <td>${roleBadge(u.role)}</td>
       <td style="color:var(--accent)">${u.addedBy||'System'}</td>
       <td>
+        <button class="btn btn-secondary" style="font-size:9px;padding:2px 8px;margin-right:4px;" onclick="window.adminResetPassword(${u.id})">🔑 Reset PW</button>
         ${u.username==='admin'
           ? '<span style="font-size:9px;color:var(--accent)">Protected</span>'
           : `<button class="btn btn-danger" style="font-size:9px;padding:2px 8px;" onclick="window.deleteUser(${u.id})">Remove</button>`
@@ -1600,6 +1599,43 @@ window.deleteUser = function(id){
   renderUsers();
   window.toast('User '+u.name+' removed','info');
 }
+
+// ── PASSWORD MANAGEMENT (go-live prep) ────────────────────────────────────
+// NOTE: users live in this browser's localStorage. A password change applies
+// on THIS device/browser only until the Users list moves to SharePoint.
+window.changeMyPassword = function(){
+  if(!currentUser){ window.toast('Please log in first.','error'); return; }
+  var me = users.find(function(u){ return u.username===currentUser; });
+  if(!me){ window.toast('Current user record not found.','error'); return; }
+  var cur = prompt('🔑 Change Password\n\nEnter your CURRENT password:');
+  if(cur===null) return;                                   // cancelled
+  if(cur !== me.password){ window.toast('❌ Current password is incorrect.','error'); return; }
+  var pw1 = prompt('Enter your NEW password (minimum 6 characters):');
+  if(pw1===null) return;
+  if(!pw1 || pw1.length<6){ window.toast('❌ New password must be at least 6 characters.','error'); return; }
+  if(pw1===cur){ window.toast('❌ New password must be different from the current one.','error'); return; }
+  var pw2 = prompt('Re-enter your NEW password to confirm:');
+  if(pw2===null) return;
+  if(pw1!==pw2){ window.toast('❌ Passwords do not match — nothing was changed.','error'); return; }
+  me.password = pw1;
+  saveUsers();
+  window.toast('✅ Password changed for '+me.name+'. Use it from your next login on this device.','success',5000);
+};
+
+window.adminResetPassword = function(id){
+  if(currentRole!=='admin'){ window.toast('Only Admins can reset passwords.','error'); return; }
+  var u = users.find(function(x){ return x.id===id; });
+  if(!u) return;
+  var pw1 = prompt('🔑 ADMIN RESET — set a new password for "'+u.name+'" ('+u.username+'):\n\nMinimum 6 characters.');
+  if(pw1===null) return;
+  if(!pw1 || pw1.length<6){ window.toast('❌ Password must be at least 6 characters.','error'); return; }
+  var pw2 = prompt('Re-enter the new password to confirm:');
+  if(pw2===null) return;
+  if(pw1!==pw2){ window.toast('❌ Passwords do not match — nothing was changed.','error'); return; }
+  u.password = pw1;
+  saveUsers();
+  window.toast('✅ Password reset for '+u.name+'. Remember: this applies on THIS browser — do it on their PC if they are locked out there.','success',6000);
+};
 
 // ── STATUS HELPERS ────────────────────────────────────────────────────────
 window.reqPill = function(s){
@@ -2012,22 +2048,9 @@ window.exportCurrentForm = function(){
 
 // ── SEED DEMO DATA ────────────────────────────────────────────────────────
 window.seedDemoData = function(){
-  if(srfData&&srfData.length) return;
-  const demos=[
-    {srfNo:'SRF-AHF-JUL-2026-001',date:'2026-07-01',revNo:'Rev. 00',project:'NAEM OFF',requestedBy:'Ms. Jefna',priority:'Medium',requiredDate:'2026-07-10',remarks:'Match to approved finish',submittedBy:'Ms. Jefna',submittedAt:'2026-07-01T09:00:00Z',
-     materials:[
-      {itemNo:'1',materialName:'Veneer Sample',materialType:'Natural Veneer',category:'Wood',colorFinish:'As per sample given',sampleSize:'600x2800mm',quantity:'1',status:'Requested',reqStatus:'Requested',rejectionReason:'',status:'Awaiting Sample',img1:'',img2:'',dispatchedDate:'2026-07-03',receivedDate:'',receiverNotes:'Sent via courier DHL',lastUpdatedBy:'Receiver'},
-      {itemNo:'2',materialName:'MDF Walnut Veneer Panel',materialType:'Engineered Veneer',category:'Wood',colorFinish:'Parona Walnut',sampleSize:'600x2800mm',quantity:'2',status:'Requested',reqStatus:'Requested',rejectionReason:'',status:'Sample Requested',img1:'',img2:'',dispatchedDate:'',receivedDate:'',receiverNotes:'Checking with supplier',lastUpdatedBy:'Receiver'},
-      {itemNo:'3',materialName:'Upholstery Fabric',materialType:'Fabric',category:'Fabric',colorFinish:'Warm Taupe',sampleSize:'300x300mm',quantity:'3',status:'Approved',reqStatus:'Approved',rejectionReason:'',status:'Client Approved',img1:'',img2:'',dispatchedDate:'2026-07-02',receivedDate:'2026-07-04',receiverNotes:'Approved by design team',lastUpdatedBy:'Receiver'},
-    ]},
-    {srfNo:'SRF-AHF-JUL-2026-002',date:'2026-07-05',revNo:'Rev. 00',project:'VICTORIA',requestedBy:'Ms. Jefna',priority:'High',requiredDate:'2026-07-12',remarks:'Urgent — client review',submittedBy:'Ms. Jefna',submittedAt:'2026-07-05T10:30:00Z',
-     materials:[
-      {itemNo:'1',materialName:'Brushed Brass Hardware',materialType:'Metal Fitting',category:'Metal',colorFinish:'Brushed Brass',sampleSize:'Sample piece',quantity:'5',status:'Requested',reqStatus:'Requested',rejectionReason:'',status:'Sample Requested',img1:'',img2:'',dispatchedDate:'',receivedDate:'',receiverNotes:'Noted, will source this week',lastUpdatedBy:'Receiver'},
-      {itemNo:'2',materialName:'Glass Panel Frosted',materialType:'Frosted Glass',category:'Glass',colorFinish:'Frosted Clear',sampleSize:'400x400mm',quantity:'1',status:'Requested',reqStatus:'Requested',rejectionReason:'',status:'Sample Requested',img1:'',img2:'',dispatchedDate:'',receivedDate:'',receiverNotes:'',lastUpdatedBy:''},
-    ]},
-  ];
-  srfData=demos;
-  saveData();
+  // Demo seeding retired (go-live prep): all SRF data now comes exclusively
+  // from SharePoint via loadFromSharePoint(). Never seed fake records.
+  return;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
